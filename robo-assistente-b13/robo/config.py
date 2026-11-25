@@ -71,35 +71,35 @@ WEB_ENDERECO = "https://generativelanguage.googleapis.com/v1beta/openai/"
 WEB_MODELO = "gemini-3.5-flash-lite"
 WEB_ARQUIVO_DA_CHAVE = "chave_web.txt"
 WEB_TEMPO_MAXIMO = 15             # segundos esperando a IA da web antes de desistir
-WEB_SE_FALHAR_USAR_LOCAL = False  # False = sem internet, avisa e não responde (a B13 não usa Ollama)
+WEB_SE_FALHAR_USAR_LOCAL = True  # False = sem internet, avisa e não responde (a B13 não usa Ollama)
 WEB_OPCOES_EXTRAS = {}            # opções extras do serviço. Modelos que "raciocinam" respondem
                                   # mais rápido com: {"reasoning_effort": "low"}
 
 # ---------------- Visão (câmera da frente do celular) ----------------
 # Cada recurso liga e desliga sozinho. O reconhecimento de rostos roda SEMPRE aqui na
 # B13; para a internet só vai a foto de quando você pede "o que você está vendo?".
-VISAO_LIGADA = True                    # False = o celular nem liga a câmera
-VISAO_OLHOS_SEGUEM = True              # os olhos acompanham o rosto de quem está na frente
-VISAO_RECONHECER_PESSOAS = True        # lembra rostos cadastrados ("Byte, aprende meu rosto")
-VISAO_CUMPRIMENTAR_CONHECIDOS = True   # diz "Oi, Ana!" quando vê alguém cadastrado
+VISAO_LIGADA = False                    # False = o celular nem liga a câmera
+VISAO_OLHOS_SEGUEM = False              # os olhos acompanham o rosto de quem está na frente
+VISAO_RECONHECER_PESSOAS = False        # lembra rostos cadastrados ("Byte, aprende meu rosto")
+VISAO_CUMPRIMENTAR_CONHECIDOS = False   # diz "Oi, Ana!" quando vê alguém cadastrado
 VISAO_CUMPRIMENTAR_DESCONHECIDOS = False  # diz "Oi!" para quem chega numa sala que estava vazia
 VISAO_MINUTOS_ENTRE_CUMPRIMENTOS = 30  # não cumprimenta a mesma pessoa de novo antes disso
 VISAO_SEGUNDOS_DE_SALA_VAZIA = 120     # quanto tempo sem ninguém conta como "sala vazia"
 VISAO_FOTO_PARA_WEB = True             # "o que você está vendo?" manda a foto para a IA da web
 VISAO_MODELO_LOCAL = None              # None = sem internet, avisa que não consegue ver
-VISAO_CONTAR_NOMES_PARA_IA = True      # conta para a IA quem está na frente ("Ana, Marcos")
+VISAO_CONTAR_NOMES_PARA_IA = False      # conta para a IA quem está na frente ("Ana, Marcos")
 
 CUMPRIMENTOS = ["Oi, {nome}!", "Olá, {nome}! Que bom te ver.", "E aí, {nome}? Tudo bem?"]
 CUMPRIMENTOS_DESCONHECIDOS = ["Oi! Tudo bem?", "Olá! Se precisar de mim, é só dizer ei robô."]
 
 # Olhar para quem está falando. Com duas pessoas ou mais, o robô compara o som do microfone
 # com o movimento da boca de cada rosto (tudo aqui na B13; nada é gravado).
-VISAO_OLHAR_QUEM_FALA = True
+VISAO_OLHAR_QUEM_FALA = False
 
 # Mão levantada para pedir a vez: segure a mão acima da cabeça e o robô olha para você e
 # diz "Pode falar!". Funciona a até uns 2 m. Exige o modelo de palmas:
 #   .venv/bin/python ferramentas/baixar_modelos.py visao
-VISAO_MAO_LEVANTADA = True             # False = ignora as mãos (e economiza processador)
+VISAO_MAO_LEVANTADA = False             # False = ignora as mãos (e economiza processador)
 VISAO_SEGUNDOS_COM_A_MAO_LEVANTADA = 1.5  # menos que isso é um gesto qualquer
 VISAO_SEGUNDOS_ENTRE_VEZES = 6         # intervalo entre chamar uma pessoa e chamar a próxima
 FRASES_DA_VEZ = ["Pode falar, {nome}!", "Oi, {nome}! Pode falar."]
@@ -126,7 +126,7 @@ PASTA_DE_FOTOS = "fotos"                  # fotos de "Byte, tira uma foto"
 # ---------------- Mostrar imagens ("Byte, mostra uma placa-mãe") ----------------
 # Busca na Wikipédia em português e no Wikimedia Commons (grátis, sem chave).
 # As imagens só ficam na memória enquanto vão para a tela: nada é gravado no disco.
-IMAGENS_LIGADAS = True
+IMAGENS_LIGADAS = False
 # Onde procurar: a primeira fonte dá a primeira imagem, e "mostra outra" vai alternando.
 # Só uma fonte: ["wikipedia"] ou ["commons"]. O Commons só entra se a IA puder conferir as imagens.
 IMAGENS_FONTES = ["wikipedia", "commons"]
@@ -142,7 +142,7 @@ IMAGENS_TAMANHO = 1280                 # largura da imagem pedida à Wikipédia 
 IMAGENS_TEMPO_MAXIMO = 10              # segundos esperando a Wikipédia
 
 # ---------------- Rosto e tela ----------------
-ROSTO_IA_ESCOLHE_EXPRESSAO = True      # a IA da web escolhe a expressão de cada resposta
+ROSTO_IA_ESCOLHE_EXPRESSAO = False      # a IA da web escolhe a expressão de cada resposta
 ROSTO_SEGUNDOS_DE_EXPRESSAO = 6        # quanto tempo uma expressão fica no rosto
 ROSTO_SEGUNDOS_PARA_SONO = 60          # dormindo com gente na frente: depois disso fica sonolento
 TELA_IA_PODE_MOSTRAR = True            # a IA da web mostra listas, passos e textos enquanto fala
