@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor de sinais</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+ body{overflow:auto;display:block}
+ #ed{display:flex;gap:12px;padding:10px;flex-wrap:wrap}
+ #vista{position:relative;flex:1 1 360px;min-height:360px;height:60vh;background:radial-gradient(circle at 50% 35%,#2b3f66,#142036);border-radius:12px}
+ #controles{flex:1 1 380px;min-width:300px}
+ fieldset{border:1px solid #2a3d5f;border-radius:10px;margin:0 0 10px;padding:8px}
+ legend{color:var(--suave);font-size:13px}
+ .linha{display:flex;align-items:center;gap:8px;font-size:13px}
+ .linha label{width:70px;color:var(--suave)}.linha input[type=range]{flex:1}.linha output{width:44px;text-align:right}
+ #quadros button{margin:2px}#quadros .sel{background:var(--destaque);color:#111}
+ input[type=text],select,textarea{font:inherit;background:#0b1220;color:var(--texto);border:0;border-radius:8px;padding:8px}
+ textarea{width:100%;height:110px;font-size:12px}
+</style></head>
+<body>
+<header><a href="/" style="color:#9fb0c8">← Voltar à tela</a><span class="espaco"></span><span id="msg"></span></header>
+<div id="ed">
+ <div id="vista"><canvas id="avatar"></canvas><p id="sem3d" hidden>Sem WebGL neste navegador.</p></div>
+ <div id="controles">
+  <fieldset><legend>Sinal</legend>
+   <div class="linha"><select id="tipo"><option value="sinal">palavra</option><option value="alfabeto">letra do alfabeto</option></select>
+   <input id="palavra" type="text" placeholder="ex.: bom dia  (ou A)" style="flex:1">
+   <button id="carregar" type="button">Carregar</button></div>
+  </fieldset>
+  <div id="maos"></div>
+  <fieldset><legend>Rosto</legend><div id="rosto"></div></fieldset>
+  <fieldset><legend>Quadros (segundos de cada um)</legend>
+   <div class="linha"><label>t do quadro</label><input id="t" type="number" step="0.1" min="0" value="0" style="width:80px">
+   <button id="add" type="button">Adicionar</button><button id="atualizar" type="button">Atualizar</button><button id="remover" type="button">Remover</button></div>
+   <div id="quadros"></div>
+  </fieldset>
+  <div class="linha"><button id="tocar" type="button">Tocar</button><button id="salvar" type="button" style="background:#1f6b4a">Salvar no robô</button>
+  <button id="exportar" type="button">Ver JSON</button></div>
+  <textarea id="json" hidden readonly></textarea>
+ </div>
+</div>
+<script>
+(function(){
+ "use strict";
+ var $=function(i){return document.getElementById(i)};
+ function carregar(u){return new Promise(function(ok,er){var s=document.createElement("script");s.src=u;s.onload=ok;s.onerror=er;document.head.appendChild(s)})}
+ var avatar=null,quadros=[],sel=-1,todos={sinal:{},alfabeto:{}};
+ var est={d:{usar:true,p:[.12,.14,.32],o:[0,0,0],f:[0,0,0,0,0],a:0},e:{usar:false,p:[-.12,.14,.32],o:[0,0,0],f:[0,0,0,0,0],a:0},r:{sb:0,boca:0,cab:[0,0,0]}};
+ var R={}; // caminho -> {entrada, saída}
+ function linha(pai,rot,ref,i,min,max,passo){
+  var d=document.createElement("div");d.className="linha";
+  d.innerHTML="<label>"+rot+"</label><input type=range min="+min+" max="+max+" step="+passo+"><output></output>";
+  var inp=d.firstChild.nextSibling,out=inp.nextSibling;
+  function ler(){return i===null?ref.o[ref.k]:ref.o[ref.k][i]}
+  function mostrar(){inp.value=ler();out.textContent=Number(ler()).toFixed(2)}
+  inp.oninput=function(){var v=parseFloat(inp.value);if(i===null)ref.o[ref.k]=v;else ref.o[ref.k][i]=v;out.textContent=v.toFixed(2);ver()};
+  mostrar();pai.appendChild(d);return mostrar;
+ }
+ var atualizadores=[];
+ function montar(){
+  [["d","Mão direita (de quem sinaliza)"],["e","Mão esquerda"]].forEach(function(h){
+   var f=document.createElement("fieldset"),l=document.createElement("legend");
+   var c=document.createElement("input");c.type="checkbox";c.checked=est[h[0]].usar;
+   c.onchange=function(){est[h[0]].usar=c.checked;ver()};
+   l.appendChild(c);l.appendChild(document.createTextNode(" "+h[1]+" (desmarcada = em repouso)"));f.appendChild(l);
+   var m=est[h[0]];
+   ["x (direita)","y (cima)","z (frente)"].forEach(function(n,i){atualizadores.push(linha(f,n,{o:m,k:"p"},i,i===1?-.5:-.5,i===1?.6:.55,.01))});
+   ["inclinação","giro","rolagem"].forEach(function(n,i){atualizadores.push(linha(f,n,{o:m,k:"o"},i,-180,180,5))});
+   ["polegar","indicador","médio","anelar","mínimo"].forEach(function(n,i){atualizadores.push(linha(f,n,{o:m,k:"f"},i,0,1,.05))});
+   atualizadores.push(linha(f,"abertura",{o:m,k:"a"},null,-1,1,.05));
+   f.checkbox=c;m.caixa=c;$("maos").appendChild(f);
+  });
+  var r=$("rosto");
+  atualizadores.push(linha(r,"sobrancelha",{o:est.r,k:"sb"},null,-1,1,.1));
+  atualizadores.push(linha(r,"boca",{o:est.r,k:"boca"},null,0,1,.1));
+  ["cabeça incl.","cabeça giro","cabeça rol."].forEach(function(n,i){atualizadores.push(linha(r,n,{o:est.r,k:"cab"},i,-30,30,1))});
+ }
+ function quadro(){
+  var q={t:parseFloat($("t").value)||0};
+  ["d","e"].forEach(function(k){var m=est[k];q[k]=m.usar?{p:m.p.slice(),o:m.o.slice(),f:m.f.slice(),a:m.a}:null});
+  q.r={sb:est.r.sb,boca:est.r.boca,cab:est.r.cab.slice()};return q;
+ }
+ function carregarNaTela(q){
+  ["d","e"].forEach(function(k){var m=est[k];m.usar=!!q[k];if(q[k]){["p","o","f"].forEach(function(c){if(q[k][c])m[c]=q[k][c].slice()});if(typeof q[k].a==="number")m.a=q[k].a}m.caixa.checked=m.usar});
+  var r=q.r||{};est.r.sb=r.sb||0;est.r.boca=r.boca||0;est.r.cab=(r.cab||[0,0,0]).slice();
+  $("t").value=q.t||0;atualizadores.forEach(function(a){a()});ver();
+ }
+ function ver(){if(avatar){avatar.trilha=null;avatar.atual=window.Avatar3D.pose(quadro())}}
+ function lista(){
+  var d=$("quadros");d.textContent="";
+  quadros.forEach(function(q,i){var b=document.createElement("button");b.textContent=(i+1)+" · "+q.t+"s";b.className=i===sel?"sel":"";
+   b.onclick=function(){sel=i;carregarNaTela(q);lista()};d.appendChild(b)});
+ }
+ function aviso(t,ok){var m=$("msg");m.textContent=t;m.style.color=ok===false?"#ff9f4a":"#4cd08a"}
+ $("add").onclick=function(){var q=quadro();quadros.push(q);sel=quadros.length-1;$("t").value=(q.t+0.5).toFixed(1);lista()};
+ $("atualizar").onclick=function(){if(sel>=0){quadros[sel]=quadro();lista()}};
+ $("remover").onclick=function(){if(sel>=0){quadros.splice(sel,1);sel=-1;lista()}};
+ $("tocar").onclick=function(){if(avatar&&quadros.length)avatar.tocarQuadros(quadros,1).then(function(){})};
+ $("exportar").onclick=function(){var t=$("json");t.hidden=false;t.value=JSON.stringify({quadros:quadros});t.select()};
+ function url(t){return "/libras/animacoes/"+t+".json"}
+ function lerJ(u){return fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.json():{}}).catch(function(){return {}})}
+ function carregarTodos(){return Promise.all([lerJ(url("sinais")),lerJ(url("sinais_usuario")),lerJ(url("alfabeto")),lerJ(url("alfabeto_usuario"))]).then(function(r){
+  todos.sinal=Object.assign({},r[0],r[1]);todos.alfabeto=Object.assign({},r[2],r[3])})}
+ function chave(p,tipo){var k=(p.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").match(/[a-z0-9]+/g)||[]).join(" ");return tipo==="alfabeto"?k.toUpperCase().slice(0,1):k}
+ $("carregar").onclick=function(){carregarTodos().then(function(){
+  var tipo=$("tipo").value,k=chave($("palavra").value,tipo),d=todos[tipo][k]||todos[tipo][k.toUpperCase()];
+  if(!d){aviso("não achei '"+k+"'",false);return}
+  quadros=JSON.parse(JSON.stringify(d.quadros));sel=0;lista();carregarNaTela(quadros[0]);aviso("carregado: "+k)})};
+ $("salvar").onclick=function(){
+  var tipo=$("tipo").value,p=$("palavra").value.trim();
+  if(!p||!quadros.length){aviso("escreva a palavra e adicione ao menos um quadro",false);return}
+  fetch("/api/sinal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tipo:tipo,palavra:p,dados:{quadros:quadros}})})
+   .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){aviso("gravado: "+j.palavra)})
+   .catch(function(e){aviso("não gravou ("+e.message+"). Use 'Ver JSON' e cole em libras/animacoes/sinais_usuario.json",false)});
+ };
+ montar();
+ carregar("vendor/three.min.js").catch(function(){return carregar("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js")})
+  .then(function(){return carregar("avatar.js")}).then(function(){avatar=new window.Avatar3D($("avatar"));if(!avatar.ok){avatar=null;$("sem3d").hidden=false}else ver()})
+  .catch(function(){$("sem3d").hidden=false});
+})();
+</script></body></html>

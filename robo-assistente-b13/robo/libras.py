@@ -18,6 +18,7 @@ As imagens e vídeos NÃO vêm no repositório: veja libras/LEIA-ME.md.
 Teste sozinho:   python -m robo.libras "Bom dia, Ana! Hoje tem aula de informática."
 """
 
+import json
 import os
 import re
 import sys
@@ -54,6 +55,9 @@ class Libras:
         self.pasta = os.path.join(PASTA_RAIZ, getattr(config, "LIBRAS_PASTA", "libras"))
         self.sinais = self._indexar("sinais")
         self.alfabeto = self._indexar("alfabeto")
+        self.animacoes = set()      # sinais que o avatar 3D próprio sabe fazer (libras/animacoes/*.json)
+        self._marcas = {}
+        self.carregar_animacoes()
         self.tradutor = None
         self.api = None
         if getattr(config, "LIBRAS_API_LIGADA", True):
@@ -62,6 +66,28 @@ class Libras:
         if getattr(config, "LIBRAS_USAR_VLIBRAS", True):
             self._carregar_vlibras()
         print(f"[libras] {len(self.sinais)} sinal(is) e {len(self.alfabeto)} letra(s)/número(s) encontrados em {self.pasta}")
+        print(f"[libras] avatar 3D próprio sabe {len(self.animacoes)} sinal(is) animado(s)")
+
+    # ---------- sinais do avatar 3D próprio ----------
+    ARQUIVOS_DE_ANIMACAO = ("sinais.json", "sinais_usuario.json")
+
+    def carregar_animacoes(self, forcar=False):
+        """Lê as chaves dos JSON de libras/animacoes. Só relê se algum arquivo mudou (o editor grava ali)."""
+        marcas = {}
+        for nome in self.ARQUIVOS_DE_ANIMACAO:
+            caminho = os.path.join(self.pasta, "animacoes", nome)
+            if os.path.isfile(caminho):
+                marcas[caminho] = os.path.getmtime(caminho)
+        if not forcar and marcas == self._marcas:
+            return
+        self._marcas, chaves = marcas, set()
+        for caminho in marcas:
+            try:
+                with open(caminho, encoding="utf-8") as f:
+                    chaves |= {_chave(k) for k in json.load(f) if not k.startswith("_")}
+            except Exception as erro:
+                print(f"[libras] não consegui ler {caminho}: {erro}")
+        self.animacoes = chaves
 
     def _indexar(self, subpasta: str) -> dict:
         """chave -> caminho do arquivo (relativo à pasta libras, como o tablet vai pedir)."""
@@ -122,7 +148,12 @@ class Libras:
         while i < len(glosa):
             for tamanho in range(min(MAXIMO_DE_PALAVRAS_NO_SINAL, len(glosa) - i), 0, -1):
                 trecho = glosa[i:i + tamanho]
-                caminho = self.sinais.get(_chave(" ".join(trecho)))
+                chave = _chave(" ".join(trecho))
+                if chave in self.animacoes:
+                    itens.append({"palavra": " ".join(trecho), "modo": "animacao", "chave": chave})
+                    i += tamanho
+                    break
+                caminho = self.sinais.get(chave)
                 if caminho:
                     itens.append({"palavra": " ".join(trecho), "modo": "sinal", "url": self._url(caminho)})
                     i += tamanho
@@ -136,12 +167,14 @@ class Libras:
         """Vai pedir o vídeo do avatar à API? (o robô avisa o tablet para mostrar "gerando...")"""
         return bool(self.api and self.api.video_ligado and self.api.disponivel())
 
-    def traduzir(self, texto: str) -> dict:
-        """Tudo que o tablet precisa para mostrar a frase em Libras."""
+    def traduzir(self, texto: str, com_video=True) -> dict:
+        """Tudo que o tablet precisa para mostrar a frase em Libras.
+        com_video=False: não pede o vídeo do avatar (a tela usa o avatar 3D próprio)."""
+        self.carregar_animacoes()
         glosa = self.glosa(texto)
         itens = self.montar(glosa)
         c = self.config
-        video = self.api.video(" ".join(glosa)) if self.api else None
+        video = self.api.video(" ".join(glosa)) if (self.api and com_video) else None
         return {"frase": texto.strip(), "glosa": " ".join(glosa), "itens": itens,
                 "video": self._url(video) if video else None,
                 "segundos_por_sinal": getattr(c, "LIBRAS_SEGUNDOS_POR_SINAL", 2.0),
@@ -156,7 +189,9 @@ if __name__ == "__main__":
     resultado = libras.traduzir(" ".join(sys.argv[1:]) or "Bom dia, Ana! Hoje tem aula de informática.")
     print("glosa:", resultado["glosa"])
     for item in resultado["itens"]:
-        if item["modo"] == "sinal":
+        if item["modo"] == "animacao":
+            print(f"  3D      {item['palavra']:<14} (avatar 3D próprio)")
+        elif item["modo"] == "sinal":
             print(f"  SINAL   {item['palavra']:<14} {item['url']}")
         else:
             faltam = [l["letra"] for l in item["letras"] if not l["url"]]

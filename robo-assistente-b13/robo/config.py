@@ -177,3 +177,23 @@ LIBRAS_API_TEMPO_MAXIMO = 8            # segundos esperando a glosa
 LIBRAS_API_TEMPO_MAXIMO_VIDEO = 30     # segundos esperando o vídeo ser gerado
 LIBRAS_API_PAUSA_APOS_FALHA = 60       # sem internet: não tenta de novo por este tempo
 LIBRAS_CACHE_MAX_MB = 300              # vídeos guardados em libras/cache (o disco da B13 é pequeno)
+
+
+# ============================================================
+#  LIBRAS: AVATAR 3D E MODO DEDICADO
+# ============================================================
+# True = o robô só traduz fala para Libras. Não carrega a IA, a voz (Piper), a câmera (OpenCV) nem o Vosk:
+# poupa memória na B13 e não precisa de "ei robô" nem de chave. Escuta o tempo todo, depois do primeiro toque.
+# False = o robô completo de antes; a tela de Libras fica em http://localhost:8000/libras-tela/
+LIBRAS_MODO_DEDICADO = True
+
+# Quem faz os sinais na tela:
+#   "vlibras" = vídeo do avatar 3D clássico do VLibras (vocabulário completo, precisa de internet).
+#               Se a internet ou a API falharem, a tela usa o avatar 3D próprio, sem travar.
+#   "3d"      = só o avatar 3D próprio (roda no tablet, sem internet, mas só sabe os sinais de
+#               libras/animacoes/: alfabeto manual e o que você gravar no editor).
+LIBRAS_AVATAR = "vlibras"
+
+LIBRAS_FILA_MAXIMA = 3                 # frases esperando para traduzir; passou disso, descarta a mais antiga
+LIBRAS_SEGUNDOS_MINIMOS_DE_VOZ = 0.35  # barulhos mais curtos que isso não viram frase
+LIBRAS_EDITOR_LIGADO = True            # http://localhost:8000/editor.html (só aceita gravar a partir da própria B13)
